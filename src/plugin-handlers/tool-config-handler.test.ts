@@ -54,6 +54,20 @@ describe("applyToolConfig", () => {
     })
   })
 
+  describe("#given sisyphus agent permissions", () => {
+    it("#then should deny bash and write for sisyphus", () => {
+      const params = createParams({ agents: [getAgentDisplayName("sisyphus")] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult[getAgentDisplayName("sisyphus")] as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.bash).toBe("deny")
+      expect(agent.permission.write).toBe("deny")
+    })
+  })
+
   describe("#given task_system is enabled", () => {
     describe("#when applying tool config", () => {
       it("#then should deny todowrite and todoread globally", () => {
