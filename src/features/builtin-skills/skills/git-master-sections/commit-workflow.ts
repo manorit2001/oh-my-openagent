@@ -430,9 +430,17 @@ git commit -m "<message-matching-COMMIT_CONFIG>"
 git log -1 --oneline
 \`\`\`
 
-### 5.4 Commit Message Generation
+### 5.4 Commit Message Drafting
 
-**Based on COMMIT_CONFIG from Phase 1:**
+**Based on COMMIT_CONFIG from Phase 1 and the best-git-commit rules:**
+
+- Use a short subject line.
+- Leave a blank line before the body.
+- Put the body to work: explain the why, intent, tradeoffs, and follow-up notes.
+- Keep the body focused on decision-making and impact, not file-by-file narration.
+- Make each commit an atomic logical unit that is independently bisectable and revertable.
+- Keep implementation and its direct test together.
+- Mention what changed only when it adds context.
 
 \`\`\`
 IF style == SEMANTIC AND language == KOREAN:
@@ -452,13 +460,27 @@ IF style == SHORT:
 \`\`\`
 
 **VALIDATION before each commit:**
-1. Does message match detected style?
-2. Does language match detected language?
-3. Is it similar to examples from git log?
+1. Does the subject match the detected style and language?
+2. Does the body explain why this commit exists?
+3. Is the commit boundary atomic, bisectable, and revertable?
+4. Are implementation and direct tests kept together?
+5. Is it similar to examples from git log when that helps?
 
 If ANY check fails -> REWRITE message.
+
+### 5.5 Commit Trailers & Attribution
+
+When assistant attribution is needed, use this order:
+
+\`\`\`text
+Assisted-by: AGENT_NAME:MODEL_VERSION
+Signed-off-by: <git author name> <git author email>
 \`\`\`
-\</execution>
+
+\`Signed-off-by\` must use the actual git author identity from repository metadata or git config.
+
+If attribution is not needed, keep the commit body focused on the change itself.
+</execution>
 
 ---
 
