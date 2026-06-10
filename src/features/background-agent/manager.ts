@@ -251,14 +251,14 @@ export class BackgroundManager {
     }
   }
 
-  async assertCanSpawn(parentSessionID: string): Promise<SubagentSpawnContext> {
-    const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionID, this.directory)
+  async assertCanSpawn(parentSessionId: string): Promise<SubagentSpawnContext> {
+    const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionId, this.directory)
     const maxDepth = getMaxSubagentDepth(this.config)
     if (spawnContext.childDepth > maxDepth) {
       throw createSubagentDepthLimitError({
         childDepth: spawnContext.childDepth,
         maxDepth,
-        parentSessionID,
+        parentSessionID: parentSessionId,
         rootSessionID: spawnContext.rootSessionID,
       })
     }
@@ -266,13 +266,13 @@ export class BackgroundManager {
     return spawnContext
   }
 
-  async reserveSubagentSpawn(parentSessionID: string): Promise<{
+  async reserveSubagentSpawn(parentSessionId: string): Promise<{
     spawnContext: SubagentSpawnContext
     descendantCount: number
     commit: () => number
     rollback: () => void
   }> {
-    const spawnContext = await this.assertCanSpawn(parentSessionID)
+    const spawnContext = await this.assertCanSpawn(parentSessionId)
     const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
     let settled = false
 
@@ -343,31 +343,31 @@ export class BackgroundManager {
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
 
-  private updateTaskParent(task: BackgroundTask, parentSessionID: string): void {
-    if (task.parentSessionId === parentSessionID) {
+  private updateTaskParent(task: BackgroundTask, parentSessionId: string): void {
+    if (task.parentSessionId === parentSessionId) {
       return
     }
 
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
-    task.parentSessionId = parentSessionID
-    const taskIDs = this.tasksByParentSession.get(parentSessionID) ?? new Set<string>()
+    task.parentSessionId = parentSessionId
+    const taskIDs = this.tasksByParentSession.get(parentSessionId) ?? new Set<string>()
     taskIDs.add(task.id)
-    this.tasksByParentSession.set(parentSessionID, taskIDs)
+    this.tasksByParentSession.set(parentSessionId, taskIDs)
   }
 
-  private removeTaskFromParentIndex(taskID: string, parentSessionID: string | undefined): void {
-    if (!parentSessionID) {
+  private removeTaskFromParentIndex(taskID: string, parentSessionId: string | undefined): void {
+    if (!parentSessionId) {
       return
     }
 
-    const taskIDs = this.tasksByParentSession.get(parentSessionID)
+    const taskIDs = this.tasksByParentSession.get(parentSessionId)
     if (!taskIDs) {
       return
     }
 
     taskIDs.delete(taskID)
     if (taskIDs.size === 0) {
-      this.tasksByParentSession.delete(parentSessionID)
+      this.tasksByParentSession.delete(parentSessionId)
     }
   }
 
@@ -376,7 +376,7 @@ export class BackgroundManager {
       agent: input.agent,
       model: input.model,
       description: input.description,
-      parentSessionID: input.parentSessionId,
+      parentSessionId: input.parentSessionId,
     })
 
     if (!input.agent || input.agent.trim() === "") {
@@ -387,7 +387,7 @@ export class BackgroundManager {
 
     try {
       log("[background-agent] spawn guard passed", {
-        parentSessionID: input.parentSessionId,
+        parentSessionId: input.parentSessionId,
         rootSessionID: spawnReservation.spawnContext.rootSessionID,
         childDepth: spawnReservation.spawnContext.childDepth,
         descendantCount: spawnReservation.descendantCount,
@@ -451,7 +451,7 @@ export class BackgroundManager {
       this.markPreStartDescendantReservation(task)
 
       // Signal CLI run mode that background tasks are active
-      this.updateBackgroundTaskMarker(input.parentSessionID)
+      this.updateBackgroundTaskMarker(input.parentSessionId)
 
       // Trigger processing (fire-and-forget)
       void this.processKey(key)
@@ -517,7 +517,7 @@ export class BackgroundManager {
           }
 
           // Update continuation marker for CLI run mode
-          this.updateBackgroundTaskMarker(item.task.parentSessionID)
+          this.updateBackgroundTaskMarker(item.task.parentSessionId)
 
           this.markForNotification(item.task)
           this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
@@ -821,17 +821,17 @@ The fallback retry session is now created and can be inspected directly.
     return tasks
   }
 
-  private updateBackgroundTaskMarker(parentSessionID: string): void {
-    const tasks = this.getTasksByParentSession(parentSessionID)
+  private updateBackgroundTaskMarker(parentSessionId: string): void {
+    const tasks = this.getTasksByParentSession(parentSessionId)
     const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
     if (activeTasks.length > 0) {
       setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "active",
+        this.directory, parentSessionId, "background-task", "active",
         `${activeTasks.length} background task(s) active`,
       )
     } else {
       setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "idle",
+        this.directory, parentSessionId, "background-task", "idle",
       )
     }
   }
@@ -1435,8 +1435,8 @@ The fallback retry session is now created and can be inspected directly.
         }
       }
 
-      for (const parentSessionID of parentSessionsToClear) {
-        this.clearTaskHistoryWhenParentTasksGone(parentSessionID)
+      for (const parentSessionId of parentSessionsToClear) {
+        this.clearTaskHistoryWhenParentTasksGone(parentSessionId)
       }
 
       this.rootDescendantCounts.delete(sessionID)
@@ -1548,8 +1548,8 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     this.markForNotification(task)
@@ -1734,11 +1734,11 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private clearTaskHistoryWhenParentTasksGone(parentSessionID: string | undefined): void {
-    if (!parentSessionID) return
-    if (this.getTasksByParentSession(parentSessionID).length > 0) return
-    this.taskHistory.clearSession(parentSessionID)
-    this.completedTaskSummaries.delete(parentSessionID)
+  private clearTaskHistoryWhenParentTasksGone(parentSessionId: string | undefined): void {
+    if (!parentSessionId) return
+    if (this.getTasksByParentSession(parentSessionId).length > 0) return
+    this.taskHistory.clearSession(parentSessionId)
+    this.completedTaskSummaries.delete(parentSessionId)
   }
 
   private scheduleTaskRemoval(taskId: string, rescheduleCount = 0): void {
@@ -1852,8 +1852,8 @@ The task was re-queued on a fallback model after a retryable failure.
     removeTaskToastTracking(task.id)
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     if (options?.skipNotification) {
@@ -1975,8 +1975,8 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     try {
@@ -2094,7 +2094,7 @@ The task was re-queued on a fallback model after a retryable failure.
           if (isAbortedSessionError(error)) {
             log("[background-agent] Parent session aborted while loading messages; using messageDir fallback:", {
               taskId: task.id,
-              parentSessionID: task.parentSessionId,
+              parentSessionId: task.parentSessionId,
             })
           }
           const messageDir = join(MESSAGE_STORAGE, task.parentSessionId)
@@ -2143,7 +2143,7 @@ The task was re-queued on a fallback model after a retryable failure.
           if (isAbortedSessionError(error)) {
             log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
               taskId: task.id,
-              parentSessionID: task.parentSessionId,
+              parentSessionId: task.parentSessionId,
             })
             this.queuePendingNotification(task.parentSessionId, notification)
           } else {
@@ -2153,7 +2153,7 @@ The task was re-queued on a fallback model after a retryable failure.
       } else {
         log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
           taskId: task.id,
-          parentSessionID: task.parentSessionId,
+          parentSessionId: task.parentSessionId,
         })
       }
 
@@ -2216,8 +2216,8 @@ The task was re-queued on a fallback model after a retryable failure.
         }
         this.cleanupPendingByParent(task)
         // Update continuation marker for CLI run mode
-        if (task.parentSessionID) {
-          this.updateBackgroundTaskMarker(task.parentSessionID)
+        if (task.parentSessionId) {
+          this.updateBackgroundTaskMarker(task.parentSessionId)
         }
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
@@ -2282,8 +2282,8 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     // Update continuation marker for CLI run mode
-    if (task.parentSessionID) {
-      this.updateBackgroundTaskMarker(task.parentSessionID)
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
     this.markForNotification(task)
@@ -2504,30 +2504,30 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private enqueueNotificationForParent(
-    parentSessionID: string | undefined,
+    parentSessionId: string | undefined,
     operation: () => Promise<void>
   ): Promise<void> {
-    if (!parentSessionID) {
+    if (!parentSessionId) {
       return operation()
     }
 
-    const previous = this.notificationQueueByParent.get(parentSessionID) ?? Promise.resolve()
+    const previous = this.notificationQueueByParent.get(parentSessionId) ?? Promise.resolve()
     const cleanupQueueEntry = (): void => {
-      if (this.notificationQueueByParent.get(parentSessionID) === current) {
-        this.notificationQueueByParent.delete(parentSessionID)
+      if (this.notificationQueueByParent.get(parentSessionId) === current) {
+        this.notificationQueueByParent.delete(parentSessionId)
       }
     }
 
     const current = previous
       .catch((error) => {
         log("[background-agent] Continuing notification queue after previous failure:", {
-          parentSessionID,
+          parentSessionId,
           error,
         })
       })
       .then(operation)
 
-    this.notificationQueueByParent.set(parentSessionID, current)
+    this.notificationQueueByParent.set(parentSessionId, current)
 
     void current.then(cleanupQueueEntry, cleanupQueueEntry)
 
