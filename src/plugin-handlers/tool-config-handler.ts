@@ -83,6 +83,7 @@ export function applyToolConfig(params: {
     sisyphus.permission = {
       ...sisyphus.permission,
       bash: "deny",
+      interactive_bash: "deny",
       write: "deny",
       call_omo_agent: "deny",
       task: "allow",

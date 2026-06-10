@@ -64,6 +64,7 @@ describe("applyToolConfig", () => {
         permission: Record<string, unknown>
       }
       expect(agent.permission.bash).toBe("deny")
+      expect(agent.permission.interactive_bash).toBe("deny")
       expect(agent.permission.write).toBe("deny")
     })
   })
