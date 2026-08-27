@@ -2,7 +2,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
 
-type AgentWithPermission = { permission?: Record<string, unknown> };
+type AgentWithPermission = { permission?: Record<string, unknown>; tools?: Record<string, unknown> };
 
 function getConfigQuestionPermission(): string | null {
   const configContent = process.env.OPENCODE_CONFIG_CONTENT;
@@ -84,13 +84,20 @@ export function applyToolConfig(params: {
       ...sisyphus.permission,
       bash: "deny",
       interactive_bash: "deny",
-      write: "deny",
       call_omo_agent: "deny",
       task: "allow",
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
+    };
+    // OpenCode's built-in write tool is gated by the "edit" permission dimension,
+    // not a "write" key (permission.write is not read by the runtime at all).
+    // Hard-disable the write tool via the per-agent tools map instead, so Sisyphus
+    // keeps edit access while being unable to use Write directly.
+    sisyphus.tools = {
+      ...sisyphus.tools,
+      write: false,
     };
   }
   const hephaestus = agentByKey(params.agentResult, "hephaestus");

@@ -8,9 +8,9 @@ function createParams(overrides: {
   agents?: string[]
   disabledTools?: string[]
 }) {
-  const agentResult: Record<string, { permission?: Record<string, unknown> }> = {}
+  const agentResult: Record<string, { permission?: Record<string, unknown>; tools?: Record<string, unknown> }> = {}
   for (const agent of overrides.agents ?? []) {
-    agentResult[agent] = { permission: {} }
+    agentResult[agent] = { permission: {}, tools: {} }
   }
 
   return {
@@ -55,17 +55,20 @@ describe("applyToolConfig", () => {
   })
 
   describe("#given sisyphus agent permissions", () => {
-    it("#then should deny bash and write for sisyphus", () => {
+    it("#then should deny bash and disable the write tool for sisyphus", () => {
       const params = createParams({ agents: [getAgentDisplayName("sisyphus")] })
 
       applyToolConfig(params)
 
       const agent = params.agentResult[getAgentDisplayName("sisyphus")] as {
         permission: Record<string, unknown>
+        tools: Record<string, unknown>
       }
       expect(agent.permission.bash).toBe("deny")
       expect(agent.permission.interactive_bash).toBe("deny")
-      expect(agent.permission.write).toBe("deny")
+      // permission.write is not a real OpenCode SDK dimension (write is gated by
+      // "edit"), so the write tool must be hard-disabled via the tools map instead.
+      expect(agent.tools.write).toBe(false)
     })
   })
 
